@@ -24,6 +24,7 @@ def bias_variable(shape, name='b'):
 def print_shape(net):
     print net.get_shape().as_list()
 
+#achieve np.mgrid with tensorflow
 def tfmgrid(L):
     v = tf.range(0, L, 1)
     x, v = tf.meshgrid(v, v)
