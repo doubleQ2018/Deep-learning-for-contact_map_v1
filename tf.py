@@ -14,8 +14,9 @@ os.environ["CUDA_VISIBLE_DEVICES"]='0'
 regularizer = tf.contrib.layers.l2_regularizer(scale=0.1)
 
 def weight_variable(shape, name='W'):
-    #with tf.variable_scope(name, initializer=tf.random_normal_initializer(),regularizer=regularizer):
-    return tf.get_variable(name, shape, initializer=tf.random_normal_initializer(), regularizer=regularizer)
+    #return tf.get_variable(name, shape, initializer=tf.random_normal_initializer(), regularizer=regularizer)
+    initial = tf.truncated_normal(shape, stddev=0.1)
+    return tf.Variable(initial)
 
 def bias_variable(shape, name='b'):
     initial = tf.constant(0.1, shape=shape)
@@ -123,21 +124,30 @@ def tf_model():
     #######################################
 
     # softmax channels of each pair into a score
-    W_conv2 = weight_variable([1, 1, out_channels, 1], 'w2')
-    b_conv2 = bias_variable([1], 'b2')
+    W_conv2 = weight_variable([1, 1, out_channels, 2], 'w2')
+    b_conv2 = bias_variable([2], 'b2')
     y_conv = tf.nn.softmax(tf.nn.conv2d(net, W_conv2, strides=[1,1,1,1], padding='SAME') + b_conv2)
-    saver = tf.train.Saver()
-
-    y_conv = tf.squeeze(y_conv, squeeze_dims=3)
+    #saver = tf.train.Saver()
+    
+    #y_conv = tf.squeeze(y_conv, squeeze_dims=3)
     #tf.reshape(y_conv, [-1])
     #tf.reshape(y_, [-1])
-    y_ = tf.placeholder("float", shape=None)
-    cross_entropy = -tf.reduce_sum(y_*tf.log(y_conv))
-    
+    #cross_entropy = -tf.reduce_mean(y_*tf.log(y_conv))
     #objective function: minimize the sum of loss function and the L2 norm
-    reg_variables = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-    reg_term = tf.contrib.layers.apply_regularization(regularizer, reg_variables)
-    loss = cross_entropy + reg_term
+    #reg_variables = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    #reg_term = tf.contrib.layers.apply_regularization(regularizer, reg_variables)
+    #loss = cross_entropy + reg_term
+    
+    y_ = tf.placeholder(tf.int32, shape=None)
+    indexs = tf.reshape(y_, [-1])
+    n_labels = tf.shape(y_conv)[3]
+    pred = tf.reshape(y_conv, [-1, 2])
+
+
+    batch_nums = tf.range(0, limit=tf.shape(pred)[0])
+    indices = tf.stack((batch_nums, indexs), axis=1)
+    loss = -tf.reduce_mean(tf.gather_nd(pred, indices))
+    #loss = -tf.reduce_mean(tf.log(pred)[tf.range(0, tf.shape(pred)[0]), y_])
     
     #training step
     train_step = tf.train.GradientDescentOptimizer(0.01).minimize(loss)
@@ -156,17 +166,18 @@ def tf_model():
         X2 = train_data[1]
         Y = train_data[2]
         # training with one sample in a batch
-        for i in xrange(1000):
+        for i in xrange(20):
             #batch = F.next_batch(1)
             x1 = X1[i][np.newaxis]
             x2 = X2[i][np.newaxis]
             y = Y[i][np.newaxis]
             sess.run(train_step, feed_dict={x_seq: x1, x_pair: x2, y_: y})
-            if i % 5 == 0:
-                train_loss = loss.eval(feed_dict={x_seq: x1, x_pair: x2, y_: y})
-                print "step %d, loss = %g" %(i, train_loss)
-                if i % 200 == 50:
-                    print y_conv.eval(feed_dict={x_seq: x1, x_pair: x2, y_: y})
+            train_loss = loss.eval(feed_dict={x_seq: x1, x_pair: x2, y_: y})
+            print "step %d, loss = %g" %(i, train_loss)
+            if i % 5 == 4:
+                print y
+                print y_.eval(feed_dict={x_seq: x1, x_pair: x2, y_: y})
+                print y_conv.eval(feed_dict={x_seq: x1, x_pair: x2, y_: y})
         #print "test accuracy = %g"%accuracy.eval(feed_dict={x_seq: aaa, x_pair: bbb, y_: ccc})
 
 
