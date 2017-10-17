@@ -77,11 +77,28 @@ class TFmodel(object):
         net = incoming
         in_channels = incoming.get_shape().as_list()[-1]
         ident = net
+        # 1st conv layer in residual block
+        W1 = self.weight_variable([filter_size, in_channels, out_channels], regularizer, block_name+'_W1')
+        #variable_summaries(W1)
+        b1 = self.bias_variable([out_channels], 'b1')
+        #variable_summaries(b1)
+        net = tf.nn.conv1d(net, W1, stride=1, padding='SAME') + b1
+        net = tf.contrib.layers.batch_norm(net)
+        net = tf.nn.relu(net)
+        # 2nd conv layer in residual block
+        W2 = self.weight_variable([filter_size, out_channels, out_channels], regularizer, block_name+'_W2')
+        #variable_summaries(W2)
+        b2 = self.bias_variable([out_channels], 'b2')
+        #variable_summaries(b2)
+        net = tf.nn.conv1d(net, W2, stride=1, padding='SAME') + b2
+        net = tf.contrib.layers.batch_norm(net)
+        net = tf.nn.relu(net)  
+        '''
         r1d = None
         if regularizer is not None:
             r1d = 'L2'
         net = tflearn.conv_1d(net, out_channels, filter_size, regularizer=r1d)
-        net = tflearn.conv_1d(net, out_channels, filter_size, regularizer=r1d)
+        net = tflearn.conv_1d(net, out_channels, filter_size, regularizer=r1d)'''
         if in_channels != out_channels:
             ch = (out_channels - in_channels)//2
             remain = out_channels-in_channels-ch
@@ -100,13 +117,17 @@ class TFmodel(object):
         #variable_summaries(W1)
         b1 = self.bias_variable([out_channels], 'b1')
         #variable_summaries(b1)
-        net = tf.nn.relu(tf.nn.conv2d(net, W1, strides=[1,1,1,1], padding='SAME') + b1)
+        net = tf.nn.conv2d(net, W1, strides=[1,1,1,1], padding='SAME') + b1
+        net = tf.contrib.layers.batch_norm(net)
+        net = tf.nn.relu(net)
         # 2nd conv layer in residual block
         W2 = self.weight_variable([filter_size, filter_size, out_channels, out_channels], regularizer, block_name+'_W2')
         #variable_summaries(W2)
         b2 = self.bias_variable([out_channels], 'b2')
         #variable_summaries(b2)
-        net = tf.nn.relu(tf.nn.conv2d(net, W2, strides=[1,1,1,1], padding='SAME') + b2)  
+        net = tf.nn.conv2d(net, W2, strides=[1,1,1,1], padding='SAME') + b2
+        net = tf.contrib.layers.batch_norm(net)
+        net = tf.nn.relu(net)  
         if in_channels != out_channels:
             ch = (out_channels - in_channels)//2
             remain = out_channels-in_channels-ch
@@ -196,6 +217,10 @@ class TFmodel(object):
         with tf.name_scope('training'):
             train_step = tf.train.GradientDescentOptimizer(0.01).minimize(loss)
 
+#        with tf.name_scope('evalution'):
+ #           predict_matrix = output_prob[:,:,:,1:]
+
+
         init = tf.initialize_all_variables()
         with tf.Session() as sess:
             sess.run(init)
@@ -211,26 +236,12 @@ class TFmodel(object):
                 x1 = X1[i][np.newaxis]
                 x2 = X2[i][np.newaxis]
                 y = Y[i][np.newaxis]
-                #sess.run(train_step, feed_dict={x_seq: x1, x_pair: x2, y_: y})
-                summary, _ = sess.run([merged_summary_op, train_step], feed_dict={x_seq: x1, x_pair: x2, y_: y})
-                summary_writer.add_summary(summary, i)
+                sess.run(train_step, feed_dict={x_seq: x1, x_pair: x2, y_: y})
                 train_loss = loss.eval(feed_dict={x_seq: x1, x_pair: x2, y_: y})
                 print "step %d, loss = %g" %(i, train_loss)
-                #if i % 5 == 0:
-                 #   summary_str, _ = sess.run([merged_summary_op, train_step], feed_dict={x_seq: x1, x_pair: x2, y_: y})
-                  #  summary_writer.add_summary(summary_str, i)
-                    #print y
-                    #print output_prob.eval(feed_dict={x_seq: x1, x_pair: x2, y_: y})
-            #print "test accuracy = %g"%accuracy.eval(feed_dict={x_seq: aaa, x_pair: bbb, y_: ccc})
-
-'''
-def main():
-    F = feature(train_file, valid_file, test_file)
-    train_data, valid_data, test_data = F.get_feature()
-    for i in xrange(1):
-        x1, x2, y = F.next_batch(2)
-        print x1.shape, x2.shape, y.shape
-'''
+                if i % 5 == 0:
+                    summary_str = sess.run(merged_summary_op, feed_dict={x_seq: x1, x_pair: x2, y_: y})
+                    summary_writer.add_summary(summary_str, i)
 
 
 M = TFmodel(3, 10, True)
