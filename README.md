@@ -1,1 +1,1 @@
-#residual network for contact prediction based on tensorflow
+# residual network for contact prediction based on tensorflow
