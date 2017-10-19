@@ -36,7 +36,12 @@ class feature(object):
         pairwise_profile = np.concatenate((pairwise_profile, other), axis = 2)
         #shape = (L, L, 5)
         true_contact = info['contactMatrix']
+        true_contact[true_contact < 0] = 0 # transfer -1 to 0
         #shape = (L, L)
+        ####### change the shape to (L, L, 2) 
+        tmp = np.where(true_contact>0, 0, 1)
+        true_contact = np.stack((tmp, true_contact), axis=-1)
+        #######
 
         return sequence_profile, pairwise_profile, true_contact
 
