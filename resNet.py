@@ -15,16 +15,6 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"]='0'
 
 
-def variable_summaries(var):
-    with tf.name_scope('summaries'):
-        mean = tf.reduce_mean(var)
-        tf.summary.scalar('mean', mean)
-        stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-        tf.summary.scalar('stddev', stddev)
-        tf.summary.scalar('max', tf.reduce_max(var))
-        tf.summary.scalar('min', tf.reduce_min(var))
-        tf.summary.histogram('histogram', var)
-
 class TFmodel(object):
     def __init__(self, filter_size_1d=17, filter_size_2d=3, block_1d=5, block_2d=5, regulation=False, batch_normalization=False):
         self.filter_size_1d = filter_size_1d
@@ -54,12 +44,10 @@ class TFmodel(object):
 
         ######## 1d Residual Network ##########
         out_channels = net.get_shape().as_list()[-1]
-        with tf.name_scope('conv_1d'):
-            for i in xrange(self.block_1d):    #1D-residual blocks building
-                self.block1d_num += 1
-                out_channels += channel_step
-                with tf.name_scope("block-" + str(self.block1d_num)):
-                    net = res_block_1d(net, out_channels, self.filter_size_1d, regularizer, batch_norm=self.BN, block_name='resBLOCK_1D'+str(i+1))
+        for i in xrange(self.block_1d):    #1D-residual blocks building
+            self.block1d_num += 1
+            out_channels += channel_step
+            net = res_block_1d(net, out_channels, self.filter_size_1d, regularizer, batch_norm=self.BN, name="ResidualBlock_1D_"+str(self.block1d_num))
                 
         #######################################
         
@@ -79,23 +67,19 @@ class TFmodel(object):
         print "Add 1d to 2d, channels = %d" %net.get_shape().as_list()[-1] 
 
         ######## 2d Residual Network ##########
-        with tf.name_scope('conv_2d'):
-            for i in xrange(self.block_2d):    #2D-residual blocks building
-                self.block2d_num += 1
-                out_channels += channel_step
-                with tf.name_scope("block-" + str(self.block1d_num)):
-                    net = res_block_2d(net, out_channels, self.filter_size_2d, regularizer, batch_norm=self.BN, block_name='BLOCK_2D'+str(i+1))
-                    #tf.summary.scalar('output', net)
+        for i in xrange(self.block_2d):    #2D-residual blocks building
+            self.block2d_num += 1
+            out_channels += channel_step
+            net = res_block_2d(net, out_channels, self.filter_size_2d, regularizer, batch_norm=self.BN, name="ResidualBlock_2D_"+str(self.block2d_num))
         #######################################
 
         print "After conv_2d channels = %d" %net.get_shape().as_list()[-1] 
 
         # softmax channels of each pair into a score
-        with tf.name_scope('softmax_layer'):
+        with tf.variable_scope('softmax_layer', values=[net]) as scpoe:
             W_out = weight_variable([1, 1, out_channels, 2], regularizer, 'W')
             b_out = bias_variable([2], 'b')
             output_prob = tf.nn.softmax(tf.nn.conv2d(net, W_out, strides=[1,1,1,1], padding='SAME') + b_out)
-            #tf.summary.scalar('output_prob', output_prob)
         
         with tf.name_scope('loss_function'):
             loss = loss1(output_prob, y_)
@@ -105,11 +89,9 @@ class TFmodel(object):
                 loss += reg_term
             tf.summary.scalar('loss', loss)
 
-        with tf.name_scope('training'):
+        with tf.name_scope("training"):
             train_step = tf.train.GradientDescentOptimizer(0.01).minimize(loss)
 
-        #top_k_indeces = self.TOP_k(output_prob, y_)
-    
         saver = tf.train.Saver() 
         init = tf.initialize_all_variables()
         with tf.Session() as sess:
@@ -124,7 +106,7 @@ class TFmodel(object):
             X2 = train_data[1]
             Y = train_data[2]
             # training with one sample in a batch
-            for i in xrange(len(X1)):
+            for i in xrange(1):
                 x1 = X1[i][np.newaxis]
                 x2 = X2[i][np.newaxis]
                 y = Y[i][np.newaxis]
