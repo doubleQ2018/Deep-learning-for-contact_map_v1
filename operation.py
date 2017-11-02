@@ -138,4 +138,5 @@ def loss_function(output_prob, y, weight=None):
             
 def loss1(output_prob, y, weight=None):
     return -tf.reduce_mean(tf.multiply(tf.log(tf.clip_by_value(output_prob,1e-10,1.0)), y))
+        #los = -tf.reduce_mean(tf.multiply(weight, tf.multiply(tf.log(tf.clip_by_value(output_prob,1e-10,1.0)), y)))
 

@@ -21,7 +21,7 @@ class feature(object):
         self._epochs_completed = 0
         self._num_examples = len(self.train_info)
 
-    def __extract_single__(self, info):
+    def extract_single(self, info):
         seq = info['sequence']
         seqLen = len(seq)
         acc = info['ACC']
@@ -33,24 +33,20 @@ class feature(object):
         psicov = info['psicovZ']
         other = info['OtherPairs']
         pairwise_profile = np.dstack((ccmpred, psicov))
-        pairwise_profile = np.concatenate((pairwise_profile, other), axis = 2)
-        #shape = (L, L, 5)
+        pairwise_profile = np.concatenate((pairwise_profile, other), axis = 2) #shape = (L, L, 5)
         true_contact = info['contactMatrix']
-        true_contact[true_contact < 0] = 0 # transfer -1 to 0
-        #shape = (L, L)
-        ####### change the shape to (L, L, 2) 
-        tmp = np.where(true_contact>0, 0, 1)
-        true_contact = np.stack((tmp, true_contact), axis=-1)
-        #######
+        true_contact[true_contact < 0] = 0 # transfer -1 to 0, shape = (L, L)
+        true_contact = np.tril(true_contact, k=-6) + np.triu(true_contact, k=6) # remove the diagnol contact
 
         return sequence_profile, pairwise_profile, true_contact
+    
 
-    def __process_feature__(self, infos):
+    def process_feature(self, infos):
         f1 = []
         f2 = []
         fl = []
         for info in infos:
-            x1, x2, y = self.__extract_single__(info)
+            x1, x2, y = self.extract_single(info)
             f1.append(x1)
             f2.append(x2)
             fl.append(y)
@@ -61,12 +57,15 @@ class feature(object):
 
     def get_feature(self):
         # training data
-        self.train_data = self.__process_feature__(self.train_info)
+        self.train_data = self.process_feature(self.train_info)
         # validation data
-        self.valid_data = self.__process_feature__(self.valid_info)
+        self.valid_data = self.process_feature(self.valid_info)
         # testing data
-        self.test_data = self.__process_feature__(self.test_info)
+        self.test_data = self.process_feature(self.test_info)
         return self.train_data, self.valid_data, self.test_data
+    
+    def get_one(self):
+        return self.valid_info[0]
     
     def next_batch(self, batch_size, shuffle = True):
         start = self._index_in_epoch
@@ -101,6 +100,14 @@ class feature(object):
             self._index_in_epoch += batch_size
             end = self._index_in_epoch
             return self._f1[start:end], self._f2[start:end], self._fl[start:end]
+
+def test():
+    F = feature(train_file, valid_file, test_file)
+    one_data =  F.get_one()
+    print one_data['name']
+    m = one_data['contactMatrix']
+    for x in m:
+        print ''.join([str(1 if i>0 else 0) for i in x])
 
 '''
     def lensBin(self):
